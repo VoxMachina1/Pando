@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tube — a front-end for curated video corpora</title>
+<style>
+  :root{
+    --bg:#0e1013; --panel:#16191f; --panel2:#1c2027; --line:#262b34;
+    --text:#e8e6e1; --dim:#9aa3ad; --accent:#d9a441; --accent2:#7fb069;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:ui-sans-system,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:inherit}
+  header{position:sticky;top:0;z-index:40;background:rgba(14,16,19,.92);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .bar{max-width:1440px;margin:0 auto;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .brand{font-weight:800;letter-spacing:.02em;font-size:20px;white-space:nowrap}
+  .brand .t{color:var(--accent)}
+  .brand small{display:block;font-weight:500;color:var(--dim);font-size:11px;letter-spacing:.04em}
+  .search{flex:1;min-width:180px}
+  .search input{width:100%;padding:9px 12px;border-radius:999px;border:1px solid var(--line);
+    background:var(--panel);color:var(--text);font-size:14px;outline:none}
+  .search input:focus{border-color:var(--accent)}
+  button,.btn{cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--text);
+    border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600}
+  button:hover,.btn:hover{border-color:var(--accent)}
+  button.on{background:var(--accent);color:#141414;border-color:var(--accent)}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .sub{max-width:1440px;margin:0 auto;padding:8px 16px 0;color:var(--dim);font-size:13px}
+  .chips{max-width:1440px;margin:0 auto;padding:10px 16px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .chip{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:999px;
+    padding:6px 12px;font-size:12.5px;cursor:pointer}
+  .chip.on{background:var(--text);color:#111;border-color:var(--text);font-weight:700}
+  select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font-size:13px}
+  label.tog{font-size:13px;color:var(--dim);display:flex;gap:6px;align-items:center;cursor:pointer}
+  main{max-width:1440px;margin:0 auto;padding:16px}
+  .stats{color:var(--dim);font-size:12.5px;margin:2px 0 14px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+    display:flex;flex-direction:column;transition:border-color .15s}
+  .card:hover{border-color:#3a4150}
+  .thumb{position:relative;cursor:pointer;aspect-ratio:16/9;background:#000}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .dur{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.82);color:#fff;font-size:12px;
+    padding:2px 6px;border-radius:6px;font-variant-numeric:tabular-nums}
+  .watched{position:absolute;left:8px;top:8px;background:rgba(0,0,0,.82);color:var(--accent2);
+    font-size:11px;padding:2px 7px;border-radius:6px;font-weight:700}
+  .meta{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
+  .ttl{font-size:14.5px;line-height:1.35;font-weight:600;cursor:pointer}
+  .ttl:hover{color:var(--accent)}
+  .chn{font-size:12.5px;color:var(--dim)}
+  .row{display:flex;justify-content:space-between;align-items:center;margin-top:auto}
+  .views{font-size:12px;color:var(--dim)}
+  .acts{display:flex;gap:6px}
+  .icon{border-radius:8px;padding:5px 9px;font-size:13px}
+  .icon.on{background:var(--accent);color:#141414;border-color:var(--accent)}
+  .empty{color:var(--dim);text-align:center;padding:60px 0;font-size:15px}
+  footer{max-width:1440px;margin:0 auto;padding:28px 16px 44px;color:var(--dim);font-size:13px;
+    border-top:1px solid var(--line);line-height:1.6}
+  footer code{background:var(--panel2);padding:1px 6px;border-radius:6px;color:var(--text)}
+  /* player overlay */
+  #playerWrap{position:fixed;inset:0;background:rgba(5,6,8,.96);z-index:100;display:none;flex-direction:column}
+  #playerWrap.open{display:flex}
+  #playerTop{display:flex;gap:10px;align-items:center;padding:12px 16px;flex-wrap:wrap}
+  #playerTitle{font-size:16px;font-weight:700;flex:1;min-width:200px}
+  #stage{flex:1;display:flex;align-items:center;justify-content:center;padding:0 16px}
+  #stage .frame{width:min(1180px,100%);aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden}
+  #stage iframe{width:100%;height:100%;border:0;display:block}
+  #playerKeys{padding:10px 16px 16px;color:var(--dim);font-size:12.5px;text-align:center}
+  kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:0 6px;color:var(--text)}
+  dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;max-width:520px;width:92%}
+  dialog::backdrop{background:rgba(0,0,0,.7)}
+  dialog input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);margin:8px 0}
+  .small{font-size:12.5px;color:var(--dim)}
+  /* playlists */
+  #plBar .lbl{font-size:12.5px;color:var(--dim);font-weight:700;letter-spacing:.03em}
+  #plBar .chip.new{border-style:dashed;color:var(--accent)}
+  #plHead{display:none;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;margin-bottom:14px}
+  #plHead.open{display:block}
+  #plHead h2{margin:0 0 4px;font-size:19px}
+  #plHead .pmeta{color:var(--dim);font-size:12.5px;margin-bottom:10px}
+  #plHead .prow{display:flex;gap:8px;flex-wrap:wrap}
+  .plrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
+  .plrow:last-child{border-bottom:0}
+  .plrow .nm{font-weight:600;font-size:14px}
+  .plrow .ct{color:var(--dim);font-size:12px}
+  #upNext{padding:0 16px 4px;color:var(--dim);font-size:13px;text-align:center}
+  #upNext strong{color:var(--text)}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand"><span id="corpusTitle">—<span class="t">tube</span></span><small id="corpusSub">a front-end for curated video corpora</small></div>
+    <div class="search"><input id="q" type="search" placeholder="Search titles and channels…"></div>
+    <div class="tabs" id="tabs">
+      <button data-view="home" class="on">Home</button>
+      <button data-view="longs">Longs</button>
+      <button data-view="liked">Liked</button>
+      <button data-view="later">Watch later</button>
+      <button data-view="history">History</button>
+    </div>
+    <button id="tvBtn" title="Lean-back autoplay mode">📺 TV mode</button>
+    <button id="corpusBtn" title="Point this page at another corpus repo">🔀 Change topic</button>
+  </div>
+  <div class="sub" id="corpusDesc"></div>
+  <div class="chips" id="chips"></div>
+  <div class="chips" id="plBar"></div>
+</header>
+
+<main>
+  <div id="plHead"></div>
+  <div class="stats" id="stats"></div>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" style="display:none">Nothing here yet.</div>
+</main>
+
+<footer>
+  <p>Load another corpus with <code>?corpus=github-user/repo</code> or the Corpus button
+  (format: <code>CORPUS.md</code>). Liked, watch-later, history and playlists live only in this browser.</p>
+  <p id="footMeta"></p>
+</footer>
+
+<div id="playerWrap" aria-hidden="true">
+  <div id="playerTop">
+    <div id="playerTitle"></div>
+    <button id="likeBtn" class="icon">♥ Like</button>
+    <button id="laterBtn" class="icon">＋ Watch later</button>
+    <button id="plBtn" class="icon">＋ Playlist</button>
+    <button id="autoBtn" class="icon" title="Auto-play the next video in the queue when one finishes">▶▶ Autoplay</button>
+    <button id="prevBtn">⏮ Prev</button>
+    <button id="nextBtn">Next ⏭</button>
+    <button id="closeBtn">✕ Close</button>
+  </div>
+  <div id="stage"><div class="frame" id="frame"></div></div>
+  <div id="upNext"></div>
+  <div id="playerKeys">Keys: <kbd>Space</kbd> pause · <kbd>N</kbd> next · <kbd>P</kbd> previous ·
+    <kbd>←</kbd>/<kbd>→</kbd> ∓10s · <kbd>1</kbd>–<kbd>9</kbd> jump to 10–90% · <kbd>0</kbd> restart ·
+    <kbd>M</kbd> mute · <kbd>Esc</kbd> exit</div>
+</div>
+
+<dialog id="corpusDlg">
+  <form method="dialog">
+    <h3 style="margin:4px 0">Load a corpus</h3>
+    <p class="small">Enter a GitHub repo as <code>user/repo</code> — it must contain a
+    <code>corpus.json</code> at its root. Or paste a full URL to a corpus.json.</p>
+    <input id="corpusInput" placeholder="e.g. voxmachina1/ai-education-corpus">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button value="cancel">Cancel</button>
+      <button id="corpusGo" value="go" class="on">Load corpus</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="plDlg">
+  <form method="dialog">
+    <h3 style="margin:4px 0">Save to playlist</h3>
+    <p class="small" id="plDlgFor"></p>
+    <div id="plList"></div>
+    <input id="plNewName" placeholder="New playlist name…">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button value="cancel">Done</button>
+      <button id="plCreate" value="go" class="on">＋ Create &amp; add</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+"use strict";
+/* ---------- corpus loading ---------- */
+const DEMO = {title:"Demo", subtitle:"embedded fallback corpus", videos:[
+  {id:"VMj-3S1tku0", title:"(demo) Let's build GPT: from scratch, in code, spelled out", channel:"demo", duration:6866, views:0}],
+  channels:[{id:"demo", name:"Demo channel", category:"Demo"}]};
+
+const params = new URLSearchParams(location.search);
+async function fetchJSON(url){ const r = await fetch(url); if(!r.ok) throw new Error(r.status); return r.json(); }
+async function loadCorpus(){
+  const src = params.get("src"), corp = params.get("corpus");
+  try{
+    if(src) return {data: await fetchJSON(src), from: src};
+    if(corp){
+      for(const br of ["main","master"]){
+        try{ const u = `https://raw.githubusercontent.com/${corp}/${br}/corpus.json`;
+             return {data: await fetchJSON(u), from: u}; }catch(e){}
+      }
+      throw new Error("corpus not found");
+    }
+    return {data: await fetchJSON("corpus.json"), from: "corpus.json (same folder)"};
+  }catch(e){
+    return {data: DEMO, from: "embedded demo (no corpus found)"};
+  }
+}
+function videoIdFrom(s){
+  if(!s) return null;
+  const m = String(s).match(/(?:v=|youtu\.be\/|\/shorts\/|\/embed\/)?([A-Za-z0-9_-]{11})(?:[?&].*)?$/);
+  return m ? m[1] : null;
+}
+function normalize(raw){
+  const c = {title: raw.title||"Untitled corpus", subtitle: raw.subtitle||"",
+    description: raw.description||"", generated: raw.generated||"",
+    channels: new Map(), videos: []};
+  (raw.channels||[]).forEach(ch => c.channels.set(ch.id, ch));
+  (raw.videos||[]).forEach(v => {
+    if(typeof v === "string"){ const id = videoIdFrom(v); if(id) c.videos.push({id, title:"", channel:"", duration:0, views:0}); }
+    else if(v && v.id) c.videos.push(v);
+  });
+  return c;
+}
+
+/* ---------- state ---------- */
+let CORPUS, queue = [], current = null, ytPlayer = null, tvMode = false;
+const store = {
+  key(){ return "tube::" + (CORPUS ? CORPUS.title : "none"); },
+  get(k, d){ try{ return JSON.parse(localStorage.getItem(this.key()+"::"+k)) ?? d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(this.key()+"::"+k, JSON.stringify(v)); }catch(e){} }
+};
+let liked = new Set(), later = new Set(), watched = {};
+let view = "home", chip = "All", chanFilter = "All", sortBy = "views", query = "";
+/* playlists: [{id, name, items:[videoId,...]}] — persisted per corpus, order matters */
+let playlists = [], activePlaylist = null, plTarget = null;
+let autoplay = false, loopList = true, queueContext = null; /* queueContext: {type:"playlist", id} | {type:"view"} | null */
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const fmtDur = s => !s ? "" : (s>=3600 ? Math.floor(s/3600)+":"+String(Math.floor(s%3600/60)).padStart(2,"0")+":"+String(Math.floor(s%60)).padStart(2,"0")
+                                     : Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0"));
+const fmtViews = v => !v ? "" : v>=1e6 ? (v/1e6).toFixed(1).replace(/\.0$/,"")+"M views"
+                               : v>=1e3 ? Math.round(v/1e3)+"K views" : v+" views";
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmtDate = s => { if(!s || s.length < 7) return "";
+  const m = MONTHS[Number(s.slice(5,7))-1]; return m ? m + " " + s.slice(0,4) : s.slice(0,4); };
+const esc = s => String(s??"").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const chanOf = v => CORPUS.channels.get(v.channel) || {name:"Unknown", category:"—"};
+function thumb(id){ return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`; }
+
+/* ---------- filtering & render ---------- */
+const plById = id => playlists.find(p => p.id === id) || null;
+function filtered(){
+  if(view === "playlist"){
+    const pl = plById(activePlaylist);
+    let vs = pl ? pl.items.map(id => CORPUS.videos.find(v => v.id === id)).filter(Boolean) : [];
+    if(query){ const q = query.toLowerCase();
+      vs = vs.filter(v => (v.title||"").toLowerCase().includes(q) || chanOf(v).name.toLowerCase().includes(q)); }
+    return vs;
+  }
+  let vs = CORPUS.videos.slice();
+  if(view === "liked") vs = vs.filter(v => liked.has(v.id));
+  if(view === "later") vs = vs.filter(v => later.has(v.id));
+  if(view === "history") vs = vs.filter(v => watched[v.id]).sort((a,b) => watched[b.id]-watched[a.id]);
+  if(view === "longs") vs = vs.filter(v => (v.duration||0) >= 1200);
+  if(chip !== "All") vs = vs.filter(v => chanOf(v).category === chip);
+  if(chanFilter !== "All") vs = vs.filter(v => v.channel === chanFilter);
+  if(query){ const q = query.toLowerCase();
+    vs = vs.filter(v => (v.title||"").toLowerCase().includes(q) || chanOf(v).name.toLowerCase().includes(q)); }
+  if(view !== "history"){
+    if(sortBy === "views") vs.sort((a,b) => (b.views||0)-(a.views||0));
+    if(sortBy === "newest") vs.sort((a,b) => (b.published||"").localeCompare(a.published||""));
+    if(sortBy === "duration") vs.sort((a,b) => (b.duration||0)-(a.duration||0));
+    if(sortBy === "title") vs.sort((a,b) => (a.title||"").localeCompare(b.title||""));
+    if(sortBy === "shuffle"){ for(let i=vs.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [vs[i],vs[j]]=[vs[j],vs[i]]; } }
+  }
+  return vs;
+}
+function render(){
+  renderPlBar(); renderPlHead();
+  const vs = filtered();
+  const hrs = Math.round(CORPUS.videos.reduce((a,v)=>a+(v.duration||0),0)/3600);
+  $("#stats").textContent = `${vs.length} of ${CORPUS.videos.length} videos · ${CORPUS.channels.size} channels · ~${hrs} hours in the full corpus`;
+  $("#empty").style.display = vs.length ? "none" : "block";
+  $("#grid").innerHTML = vs.map(v => { const ch = chanOf(v); return `
+   <div class="card">
+     <div class="thumb" data-play="${v.id}">
+       <img loading="lazy" src="${thumb(v.id)}" alt="">
+       ${v.duration?`<span class="dur">${fmtDur(v.duration)}</span>`:""}
+       ${watched[v.id]?`<span class="watched">watched</span>`:""}
+     </div>
+     <div class="meta">
+       <div class="ttl" data-play="${v.id}">${esc(v.title || v.id)}</div>
+       <div class="chn">${esc(ch.name)} · ${esc(ch.category)}</div>
+       <div class="row"><span class="views">${fmtViews(v.views)}${v.published ? " · " + fmtDate(v.published) : ""}</span>
+         <span class="acts">
+           ${view === "playlist" ? `
+           <button class="icon" data-up="${v.id}" title="Move up">↑</button>
+           <button class="icon" data-down="${v.id}" title="Move down">↓</button>
+           <button class="icon" data-remove="${v.id}" title="Remove from playlist">✕</button>` : ""}
+           <button class="icon" data-addpl="${v.id}" title="Save to playlist">＋▾</button>
+           <button class="icon ${liked.has(v.id)?"on":""}" data-like="${v.id}" title="Like">♥</button>
+           <button class="icon ${later.has(v.id)?"on":""}" data-later="${v.id}" title="Watch later">＋</button>
+         </span></div>
+     </div>
+   </div>`; }).join("");
+}
+function renderChips(){
+  const cats = ["All", ...new Set([...CORPUS.channels.values()].map(c=>c.category).filter(Boolean))];
+  const chans = [...CORPUS.channels.values()];
+  $("#chips").innerHTML = cats.map(c =>
+    `<button class="chip ${chip===c?"on":""}" data-chip="${esc(c)}">${esc(c)}</button>`).join("")
+    + `<select id="chanSel"><option value="All">All channels</option>${
+        chans.map(ch=>`<option value="${esc(ch.id)}" ${chanFilter===ch.id?"selected":""}>${esc(ch.name)}</option>`).join("")}</select>`
+    + `<select id="sortSel">
+         <option value="views" ${sortBy==="views"?"selected":""}>Most viewed</option>
+         <option value="newest" ${sortBy==="newest"?"selected":""}>Newest first</option>
+         <option value="duration" ${sortBy==="duration"?"selected":""}>Longest</option>
+         <option value="title" ${sortBy==="title"?"selected":""}>Title A–Z</option>
+         <option value="shuffle" ${sortBy==="shuffle"?"selected":""}>Shuffle</option>
+       </select>`
+    + `<label class="tog"><input type="checkbox" id="longsTog" ${view==="longs"?"checked":""}> Longs only (20m+)</label>`;
+  $("#chanSel").onchange = e => { chanFilter = e.target.value; render(); };
+  $("#sortSel").onchange = e => { sortBy = e.target.value; render(); };
+  $("#longsTog").onchange = e => { setView(e.target.checked ? "longs" : "home"); };
+  document.querySelectorAll("[data-chip]").forEach(b => b.onclick = () => { chip = b.dataset.chip; renderChips(); render(); });
+}
+
+/* ---------- playlists ---------- */
+function savePlaylists(){ store.set("playlists", playlists); }
+function renderPlBar(){
+  const bar = $("#plBar"); if(!bar) return;
+  bar.innerHTML = `<span class="lbl">PLAYLISTS</span>`
+    + playlists.map(p => `<button class="chip ${view==="playlist" && activePlaylist===p.id ? "on" : ""}" data-plopen="${p.id}">${esc(p.name)} · ${p.items.length}</button>`).join("")
+    + `<button class="chip new" id="plNewBtn">＋ New playlist</button>`;
+  document.querySelectorAll("[data-plopen]").forEach(b => b.onclick = () => openPlaylist(b.dataset.plopen));
+  $("#plNewBtn").onclick = () => { const p = createPlaylist(); if(p) openPlaylist(p.id); };
+}
+function renderPlHead(){
+  const head = $("#plHead"); if(!head) return;
+  const pl = view === "playlist" ? plById(activePlaylist) : null;
+  if(!pl){ head.classList.remove("open"); head.innerHTML = ""; return; }
+  const secs = pl.items.reduce((a,id) => { const v = CORPUS.videos.find(x=>x.id===id); return a + (v ? (v.duration||0) : 0); }, 0);
+  head.classList.add("open");
+  head.innerHTML = `<h2>${esc(pl.name)}</h2>
+    <div class="pmeta">${pl.items.length} videos · ${fmtDur(secs)} total · plays in order, auto-advances in normal browsing too</div>
+    <div class="prow">
+      <button id="plPlayAll" class="on">▶ Play all</button>
+      <button id="plShuffle">🔀 Shuffle play</button>
+      <button id="plLoop" class="${loopList ? "on" : ""}" title="Loop back to the start at the end">🔁 Loop</button>
+      <button id="plRename">✎ Rename</button>
+      <button id="plDelete">🗑 Delete</button>
+    </div>`;
+  $("#plPlayAll").onclick = () => playPlaylist(pl, false);
+  $("#plShuffle").onclick = () => playPlaylist(pl, true);
+  $("#plLoop").onclick = () => { loopList = !loopList; renderPlHead(); syncAutoBtn(); };
+  $("#plRename").onclick = () => { const n = prompt("Rename playlist", pl.name); if(n && n.trim()){ pl.name = n.trim(); savePlaylists(); render(); } };
+  $("#plDelete").onclick = () => { if(confirm(`Delete playlist "${pl.name}"? The videos stay in the corpus.`)){
+    playlists = playlists.filter(p => p.id !== pl.id); savePlaylists(); activePlaylist = null; setView("home"); } };
+}
+function openPlaylist(id){ activePlaylist = id; chip = "All"; chanFilter = "All"; setView("playlist"); }
+function createPlaylist(name){
+  const n = (name ?? prompt("Name the new playlist"))?.trim();
+  if(!n) return null;
+  const p = {id: Date.now().toString(36) + Math.random().toString(36).slice(2,7), name: n, items: []};
+  playlists.push(p); savePlaylists(); renderPlBar();
+  return p;
+}
+function playPlaylist(pl, shuffle){
+  let vs = pl.items.map(id => CORPUS.videos.find(v => v.id === id)).filter(Boolean);
+  if(!vs.length) return;
+  if(shuffle){ vs = vs.slice(); for(let i=vs.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [vs[i],vs[j]]=[vs[j],vs[i]]; } }
+  queue = vs; queueContext = {type:"playlist", id: pl.id}; autoplay = true;
+  play(vs[0], false);
+}
+/* save-to-playlist dialog */
+function openPlDlg(videoId){
+  plTarget = videoId;
+  const v = CORPUS.videos.find(x => x.id === videoId);
+  $("#plDlgFor").textContent = v ? (v.title || v.id) : "";
+  renderPlList();
+  $("#plDlg").showModal();
+}
+function renderPlList(){
+  $("#plList").innerHTML = playlists.length ? playlists.map(p => {
+    const has = p.items.includes(plTarget);
+    return `<div class="plrow"><span><span class="nm">${esc(p.name)}</span> <span class="ct">${p.items.length} videos</span></span>
+      <button data-plpick="${p.id}" class="${has ? "on" : ""}">${has ? "✓ Added — tap to remove" : "＋ Add"}</button></div>`;
+  }).join("") : `<p class="small">No playlists yet — create one below.</p>`;
+  document.querySelectorAll("[data-plpick]").forEach(b => b.onclick = e => { e.preventDefault(); toggleInPlaylist(b.dataset.plpick, plTarget); renderPlList(); render(); });
+}
+function toggleInPlaylist(plId, videoId){
+  const pl = plById(plId); if(!pl || !videoId) return;
+  const i = pl.items.indexOf(videoId);
+  if(i >= 0) pl.items.splice(i,1); else pl.items.push(videoId);
+  savePlaylists(); refreshQueueIfPlaylist(plId);
+}
+function refreshQueueIfPlaylist(plId){
+  if(queueContext && queueContext.type === "playlist" && queueContext.id === plId && view === "playlist")
+    queue = filtered();
+}
+
+/* ---------- player / TV mode ---------- */
+function loadYTApi(){
+  if(window.YT && YT.Player) return Promise.resolve();
+  return new Promise(res => { const t = document.createElement("script");
+    t.src = "https://www.youtube.com/iframe_api"; document.head.appendChild(t);
+    window.onYouTubeIframeAPIReady = res; });
+}
+async function play(video, tv){
+  current = video; tvMode = !!tv;
+  watched[video.id] = Date.now(); store.set("history", watched);
+  $("#playerWrap").classList.add("open"); $("#playerWrap").setAttribute("aria-hidden","false");
+  $("#playerTitle").textContent = (video.title || video.id) + " — " + chanOf(video).name;
+  syncPlayerBtns(); syncAutoBtn(); updateUpNext();
+  await loadYTApi().catch(()=>{});
+  $("#frame").innerHTML = `<div id="ytSlot"></div>`;
+  if(window.YT && YT.Player){
+    ytPlayer = new YT.Player("ytSlot", { videoId: video.id,
+      playerVars: { autoplay: 1, rel: 0 },
+      events: { onStateChange: e => { if(e.data === YT.PlayerState.ENDED) onVideoEnded(); } },
+      width: "100%", height: "100%" });
+  } else {
+    $("#frame").innerHTML = `<iframe src="https://www.youtube.com/embed/${video.id}?autoplay=1&rel=0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+  }
+  render();
+}
+function step(d){
+  if(!current || !queue.length) return;
+  const i = queue.findIndex(v => v.id === current.id);
+  const n = queue[(i + d + queue.length) % queue.length];
+  if(n) play(n, tvMode);
+}
+function onVideoEnded(){
+  if(!(tvMode || autoplay)) return;                 /* plain browsing: stop, as before */
+  if(!current || !queue.length) return;
+  const i = queue.findIndex(v => v.id === current.id);
+  const atLast = i >= 0 && i === queue.length - 1;
+  if(atLast && queueContext && queueContext.type === "playlist" && !loopList){ closePlayer(); return; }
+  step(1);
+}
+function nextInQueue(){
+  if(!current || queue.length < 2) return null;
+  const i = queue.findIndex(v => v.id === current.id);
+  if(i < 0) return null;
+  if(i === queue.length - 1 && queueContext && queueContext.type === "playlist" && !loopList) return null;
+  return queue[(i + 1) % queue.length];
+}
+function syncAutoBtn(){
+  const b = $("#autoBtn"); if(!b) return;
+  const on = tvMode || autoplay;
+  b.classList.toggle("on", on);
+  b.textContent = on ? "▶▶ Autoplay on" : "▶▶ Autoplay";
+}
+function updateUpNext(){
+  const el = $("#upNext"); if(!el) return;
+  const n = (tvMode || autoplay) ? nextInQueue() : null;
+  el.innerHTML = n ? `Up next: <strong>${esc(n.title || n.id)}</strong>` : "";
+}
+function closePlayer(){
+  $("#playerWrap").classList.remove("open"); $("#frame").innerHTML = ""; ytPlayer = null; tvMode = false;
+}
+function syncPlayerBtns(){
+  if(!current) return;
+  $("#likeBtn").classList.toggle("on", liked.has(current.id));
+  $("#laterBtn").classList.toggle("on", later.has(current.id));
+}
+document.addEventListener("keydown", e => {
+  if(!$("#playerWrap").classList.contains("open")) return;
+  const p = ytPlayer;
+  if(e.key === "Escape") closePlayer();
+  else if(e.key === "n" || e.key === "N") step(1);
+  else if(e.key === "p" || e.key === "P") step(-1);
+  else if(e.key === " " && p){ e.preventDefault();
+    (p.getPlayerState && p.getPlayerState() === 1) ? p.pauseVideo() : p.playVideo && p.playVideo(); }
+  else if(e.key === "ArrowRight" && p && p.getCurrentTime) p.seekTo(p.getCurrentTime()+10, true);
+  else if(e.key === "ArrowLeft" && p && p.getCurrentTime) p.seekTo(Math.max(0, p.getCurrentTime()-10), true);
+  else if(e.key === "m" || e.key === "M"){ if(p) (p.isMuted && p.isMuted()) ? p.unMute() : p.mute && p.mute(); }
+  else if(/^[0-9]$/.test(e.key) && p && p.getDuration){
+    const d = p.getDuration(); if(d) p.seekTo(e.key === "0" ? 0 : d * (Number(e.key)/10), true); }
+});
+
+/* ---------- events ---------- */
+function setView(v){ view = v;
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.view === v));
+  renderChips(); render(); }
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => setView(b.dataset.view));
+$("#q").addEventListener("input", e => { query = e.target.value.trim(); render(); });
+document.addEventListener("click", e => {
+  const play = e.target.closest("[data-play]");
+  if(play){ const v = CORPUS.videos.find(x => x.id === play.dataset.play); if(v) play_(v); return; }
+  const lk = e.target.closest("[data-like]");
+  if(lk){ toggle(liked, lk.dataset.like, "liked"); return; }
+  const lt = e.target.closest("[data-later]");
+  if(lt){ toggle(later, lt.dataset.later, "later"); return; }
+  const ap = e.target.closest("[data-addpl]");
+  if(ap){ openPlDlg(ap.dataset.addpl); return; }
+  const rm = e.target.closest("[data-remove]");
+  if(rm){ const pl = plById(activePlaylist); if(pl){ pl.items = pl.items.filter(id => id !== rm.dataset.remove);
+    savePlaylists(); refreshQueueIfPlaylist(pl.id); render(); } return; }
+  const up = e.target.closest("[data-up]");
+  if(up){ moveInPlaylist(up.dataset.up, -1); return; }
+  const dn = e.target.closest("[data-down]");
+  if(dn){ moveInPlaylist(dn.dataset.down, 1); return; }
+});
+function moveInPlaylist(videoId, d){
+  const pl = plById(activePlaylist); if(!pl) return;
+  const i = pl.items.indexOf(videoId), j = i + d;
+  if(i < 0 || j < 0 || j >= pl.items.length) return;
+  [pl.items[i], pl.items[j]] = [pl.items[j], pl.items[i]];
+  savePlaylists(); refreshQueueIfPlaylist(pl.id); render();
+}
+function play_(v){
+  queue = filtered();
+  if(view === "playlist"){ queueContext = {type:"playlist", id: activePlaylist}; autoplay = true; }
+  else { queueContext = {type:"view"}; autoplay = false; }
+  play(v, false);
+}
+function toggle(set, id, key){ set.has(id) ? set.delete(id) : set.add(id); store.set(key, [...set]); render(); syncPlayerBtns(); }
+$("#tvBtn").onclick = () => { const vs = filtered(); if(vs.length){ queue = vs; queueContext = {type:"view"}; play(vs[0], true); } };
+$("#nextBtn").onclick = () => step(1);
+$("#prevBtn").onclick = () => step(-1);
+$("#closeBtn").onclick = closePlayer;
+$("#likeBtn").onclick = () => current && toggle(liked, current.id, "liked");
+$("#laterBtn").onclick = () => current && toggle(later, current.id, "later");
+$("#plBtn").onclick = () => current && openPlDlg(current.id);
+$("#autoBtn").onclick = () => {
+  if(tvMode || autoplay){ tvMode = false; autoplay = false; }  /* continuous play off */
+  else autoplay = true;                                        /* roll the queue in normal browsing */
+  syncAutoBtn(); updateUpNext(); };
+$("#plCreate").onclick = e => { e.preventDefault();
+  const name = $("#plNewName").value;
+  const p = createPlaylist(name);
+  if(p){ if(plTarget && !p.items.includes(plTarget)) p.items.push(plTarget); savePlaylists();
+    $("#plNewName").value = ""; renderPlList(); render(); } };
+$("#corpusBtn").onclick = () => $("#corpusDlg").showModal();
+$("#corpusGo").onclick = e => { e.preventDefault();
+  const val = $("#corpusInput").value.trim(); if(!val) return;
+  const p = new URLSearchParams(location.search);
+  if(/^https?:\/\//.test(val)){ p.delete("corpus"); p.set("src", val); } else { p.delete("src"); p.set("corpus", val); }
+  location.search = p.toString();
+};
+
+/* ---------- boot ---------- */
+(async function(){
+  const {data, from} = await loadCorpus();
+  CORPUS = normalize(data);
+  liked = new Set(store.get("liked", []));
+  later = new Set(store.get("later", []));
+  watched = store.get("history", {});
+  playlists = store.get("playlists", []);
+  $("#corpusTitle").innerHTML = esc(CORPUS.title) + '<span class="t">—tube</span>';
+  document.title = CORPUS.title + " — tube";
+  $("#corpusSub").textContent = CORPUS.subtitle || "a front-end for curated video corpora";
+  $("#corpusDesc").textContent = CORPUS.description || "";
+  $("#footMeta").textContent = (CORPUS.generated ? "Corpus generated " + CORPUS.generated + " · " : "") + "Loaded from " + from + ".";
+  renderChips(); render();
+  /* minimal corpora: fill titles best-effort via noembed */
+  const untitled = CORPUS.videos.filter(v => !v.title);
+  for(const v of untitled.slice(0, 400)){
+    try{ const d = await fetchJSON("https://noembed.com/embed?url=https://www.youtube.com/watch?v=" + v.id);
+         if(d && d.title){ v.title = d.title; } }catch(e){}
+  }
+  if(untitled.length) render();
+})();
+</script>
+</body>
+</html>
